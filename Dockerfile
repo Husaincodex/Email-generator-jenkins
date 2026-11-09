@@ -1,10 +1,18 @@
+FROM maven:3.9.9-eclipse-temurin-21 AS build
+
+WORKDIR /app
+
+COPY pom.xml .
+COPY src/ ./src/
+
+RUN mvn -B -DskipTests package
+
 FROM amazoncorretto:21-alpine
 
 WORKDIR /app
 
-COPY src/ ./src/
+COPY --from=build /app/target/email-generator-web-1.0.0.jar app.jar
 
-RUN mkdir -p out && \
-    javac -d out src/emailgenerator/*.java
+EXPOSE 8080
 
-CMD ["java", "-cp", "out", "emailgenerator.EmailMainProgram"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

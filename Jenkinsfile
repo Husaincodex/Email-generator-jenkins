@@ -1,8 +1,13 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         DOCKER_IMAGE = "husainmk/email-generator"
+        CONTAINER_NAME = "email-generator-web"
     }
 
     stages {
@@ -10,16 +15,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Java Build') {
-            steps {
-                sh '''
-                    rm -rf out
-                    mkdir -p out
-                    javac -d out src/emailgenerator/*.java
-                '''
             }
         }
 
@@ -42,6 +37,7 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        set +x
                         echo "$DOCKER_TOKEN" | docker login \
                             -u "$DOCKER_USER" --password-stdin
 
@@ -57,14 +53,17 @@ pipeline {
         stage('Deploy on EC2') {
             steps {
                 sh '''
-                    docker rm -f email-generator || true
+                    docker rm -f $CONTAINER_NAME || true
 
                     docker run -d \
-                        --name email-generator \
+                        --name $CONTAINER_NAME \
                         --restart unless-stopped \
+                        -p 80:8080 \
                         $DOCKER_IMAGE:latest
 
-                    docker ps -a
+                    sleep 10
+                    docker ps
+                    docker logs --tail 50 $CONTAINER_NAME
                 '''
             }
         }
@@ -72,11 +71,11 @@ pipeline {
 
     post {
         success {
-            echo 'Email Generator deployment successful!'
+            echo 'Email Generator Web Application deployed successfully!'
         }
 
         failure {
-            echo 'Deployment failed. Check Jenkins console output.'
+            echo 'Deployment failed. Check Console Output.'
         }
     }
 }
